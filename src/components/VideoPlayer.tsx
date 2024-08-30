@@ -101,8 +101,6 @@ const VideoPlayer = () => {
   };
 
   useEffect(() => {
-
-
     if (isSeeking) {
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", stopSeeking);
@@ -146,7 +144,7 @@ const VideoPlayer = () => {
 
           <div
             className={cn(
-              "absolute flex controls gap-x-[10px] w-full bottom-0 items-center px-[15px] py-[15px] text-black opacity-0 duration-500 transition-all",
+              "absolute flex opacity-0 controls gap-x-[10px] w-full bottom-0 items-center px-[15px] py-[15px] text-black duration-500 transition-all",
               videoRef.current &&
               videoRef.current.currentTime > 0 &&
               "group-hover:opacity-100",
