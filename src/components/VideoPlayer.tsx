@@ -19,6 +19,24 @@ const VideoPlayer = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [cornerRadius, setCornerRadius] = useState(20);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 640) {
+        setCornerRadius(25)
+      } else {
+        setCornerRadius(45)
+      }
+    };
+
+    handleResize();
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   const togglePlayPause = () => {
     if (videoRef.current) {
@@ -68,7 +86,6 @@ const VideoPlayer = () => {
     setIsPlaying(false);
   };
 
-  // Seek video to a specific time
   const handleSeek = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     if (videoRef.current) {
       const rect = (e.target as HTMLDivElement).getBoundingClientRect();
@@ -78,7 +95,6 @@ const VideoPlayer = () => {
     }
   };
 
-  // Start seeking
   const startSeeking = () => {
     togglePlayPause();
     setIsSeeking(true);
@@ -90,7 +106,6 @@ const VideoPlayer = () => {
     setIsSeeking(false);
   };
 
-  // Handle mouse move during seeking
   const handleMouseMove = (e: MouseEvent) => {
     if (isSeeking && videoRef.current) {
       const rect = (e.target as HTMLDivElement).getBoundingClientRect();
@@ -115,15 +130,15 @@ const VideoPlayer = () => {
   }, [duration, isSeeking]);
 
   return (
-    <Squircle cornerRadius={35} cornerSmoothing={0.5} className="w-full h-full">
-      <div className="group relative flex w-full h-full aspect-video rounded-[35px] bg-zinc-50">
+    <Squircle cornerRadius={cornerRadius} cornerSmoothing={0.8} className="w-full h-full block overflow-hidden">
+      <div className="group relative flex w-full h-full aspect-video bg-zinc-100">
         <video
           ref={videoRef}
           onTimeUpdate={handleTimeUpdate}
           onDurationChange={handleDurationChange}
           onEnded={handleVideoEnd}
-          className="w-full h-full overflow-hidden rounded-[35px]"
-          src="/sample-02.mp4"
+          className="w-full h-full overflow-hidden"
+          src="/sample.mp4"
         />
 
         <div className="absolute flex flex-col w-full h-full">
@@ -135,9 +150,9 @@ const VideoPlayer = () => {
           >
             <div
               onClick={togglePlayPause}
-              className="flex bg-white/10 backdrop-blur-xl rounded-full p-[35px] aspect-square cursor-pointer hover:scale-125 transition-all duration-500"
+              className="flex justify-center items-center bg-white/10 backdrop-blur-xl rounded-full p-[15px] lg:p-[35px] aspect-square cursor-pointer hover:scale-125 transition-all duration-500"
             >
-              {!isPlaying && <PlayIcon className="ml-[8px] mt-[5px]" />}
+              {!isPlaying && <PlayIcon className="w-[35px] h-[35px] sm:w-[100px] sm:h-[100px] ml-[2px] mt-[1px] lg:ml-[8px] lg:mt-[5px]" />}
               {isPlaying && <PauseIcon />}
             </div>
           </div>
@@ -154,27 +169,26 @@ const VideoPlayer = () => {
               "opacity-100",
             )}
           >
-            <ControlButton onClick={togglePlayPause}>
+            <ControlButton
+              onClick={togglePlayPause}
+              className="hidden sm:block">
               {isPlaying ? (
-                <PauseIcon width={20} height={20} />
+                <PauseIcon className="w-[20px] h-[20px]" />
               ) : (
                 <PlayIcon
-                  width={20}
-                  height={20}
-                  className="ml-[2px] mt-[1px]"
+                  className="w-[20px] h-[20px] ml-[2px] mt-[1px]"
                 />
               )}
             </ControlButton>
 
             <ControlButton onClick={toggleMute}>
               {isMuted ? (
-                <UnMuteIcon width={20} height={20} />
+                <UnMuteIcon />
               ) : (
-                <MuteIcon width={20} height={20} />
+                <MuteIcon />
               )}
             </ControlButton>
 
-            {/* -- Progress Bar -- */}
             <div className="flex flex-grow items-center justify-center px-[15px] py-[5px] gap-x-[10px] bg-white/5 backdrop-blur-md rounded-full h-[40px] z-10">
               <div className="text-[15px] text-white">
                 {videoRef.current && formatTime(videoRef.current.currentTime)}
@@ -197,9 +211,9 @@ const VideoPlayer = () => {
 
             <ControlButton onClick={toggleFullscreen}>
               {isMuted ? (
-                <FullscreenIcon width={20} height={20} />
+                <FullscreenIcon />
               ) : (
-                <FullscreenIcon width={20} height={20} />
+                <FullscreenIcon />
               )}
             </ControlButton>
           </div>

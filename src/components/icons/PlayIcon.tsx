@@ -1,19 +1,13 @@
 import { cn } from "@/lib/utils";
 
 const PlayIcon = ({
-  width = 69,
-  height = 69,
   className,
 }: {
-  width?: number;
-  height?: number;
   className?: string;
 }) => (
   <svg
-    width={width}
-    height={height}
     fill="currentColor"
-    className={cn("text-auto text-white/25", className)}
+    className={cn("text-auto text-white/25 w-[64px] h-[64px]", className)}
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 80 87"
   >
