@@ -18,7 +18,7 @@ const Page = () => {
 
       <div className="flex flex-col lg:flex-row w-full gap-x-[20px]">
         <div className="flex flex-grow">
-          <VideoPlayer />
+          <VideoPlayer video="/sample.mp4" />
         </div>
         <div className="w-[550px]">
 

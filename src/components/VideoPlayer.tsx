@@ -7,26 +7,69 @@ import ControlButton from "./ControlButton";
 import { motion } from "framer-motion";
 import { Squircle } from "corner-smoothing";
 import { cn } from "@/lib/utils";
-import { formatTime } from "media-chrome/dist/utils/time.js";
 import UnMuteIcon from "./icons/UnMuteIcon";
 import MuteIcon from "./icons/MuteIcon";
 import FullscreenIcon from "./icons/FullscreenIcon";
 
-const VideoPlayer = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+const formatTime = (timeInSeconds: number): string => {
+  if (!isFinite(timeInSeconds)) return "0:00";
+
+  const hours = Math.floor(timeInSeconds / 3600);
+  const minutes = Math.floor((timeInSeconds % 3600) / 60);
+  const seconds = Math.floor(timeInSeconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const VideoPlayer = ({
+  video
+}: {
+  video: string,
+}) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const progressBarRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [previewTime, setPreviewTime] = useState(0);
   const [cornerRadius, setCornerRadius] = useState(20);
+  const [wasPlaying, setWasPlaying] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewPosition, setPreviewPosition] = useState(0);
+  const [isVideoStarted, setIsVideoStarted] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleLoadedMetadata = () => {
+      setDuration(video.duration);
+    };
+
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+    if (video.readyState >= 1) {
+      setDuration(video.duration);
+    }
+
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    };
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 640) {
-        setCornerRadius(25)
+        setCornerRadius(25);
       } else {
-        setCornerRadius(45)
+        setCornerRadius(45);
       }
     };
 
@@ -38,107 +81,180 @@ const VideoPlayer = () => {
     };
   }, []);
 
-  const togglePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const replayVideo = () => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-      setIsPlaying(false);
-    }
-  };
-
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
-    }
-  };
-
-  const toggleFullscreen = () => {
-    if (videoRef.current && videoRef.current.requestFullscreen) {
-      videoRef.current.requestFullscreen();
-    }
-  };
-
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
+    if (!videoRef.current || isSeeking) return;
+    setCurrentTime(videoRef.current.currentTime);
+    if (!isVideoStarted && videoRef.current.currentTime > 0) {
+      setIsVideoStarted(true);
     }
   };
 
   const handleDurationChange = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-    }
+    if (!videoRef.current) return;
+    setDuration(videoRef.current.duration);
   };
 
   const handleVideoEnd = () => {
     setIsPlaying(false);
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-    if (videoRef.current) {
-      const rect = (e.target as HTMLDivElement).getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const newTime = (offsetX / rect.width) * duration;
-      videoRef.current.currentTime = newTime;
+  const togglePlayPause = () => {
+    if (!videoRef.current) return;
+
+    if (isPlaying) {
+      videoRef.current.pause();
+    } else {
+      videoRef.current.play().catch((error) => {
+        console.error("Error playing video:", error);
+      });
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const toggleMute = () => {
+    if (!videoRef.current) return;
+    videoRef.current.muted = !isMuted;
+    setIsMuted(!isMuted);
+  };
+
+  const toggleFullscreen = () => {
+    if (!videoRef.current) return;
+
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch((error) => {
+        console.error("Error exiting fullscreen:", error);
+      });
+    } else {
+      videoRef.current.requestFullscreen().catch((error) => {
+        console.error("Error entering fullscreen:", error);
+      });
     }
   };
 
-  const startSeeking = () => {
-    togglePlayPause();
+  const calculateTimeAndPosition = (e: React.MouseEvent | MouseEvent) => {
+    if (!progressBarRef.current || !videoRef.current) return { time: 0, position: 0 };
+
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const offsetX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const time = (offsetX / rect.width) * (videoRef.current.duration || 0);
+    const position = Math.max(0, Math.min(offsetX, rect.width));
+
+    return { time, position };
+  };
+
+  const handleProgressBarHover = (e: React.MouseEvent) => {
+    if (!videoRef.current || isSeeking) return;
+
+    const { time, position } = calculateTimeAndPosition(e);
+    setPreviewTime(time);
+    setPreviewPosition(position);
+    setShowPreview(true);
+
+    if (previewVideoRef.current) {
+      previewVideoRef.current.currentTime = time;
+    }
+  };
+
+  const handleProgressBarLeave = () => {
+    if (!isSeeking) {
+      setShowPreview(false);
+    }
+  };
+
+  const startSeeking = (e: React.MouseEvent) => {
+    if (!videoRef.current) return;
+
+    setWasPlaying(isPlaying);
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+
     setIsSeeking(true);
+    const { time, position } = calculateTimeAndPosition(e);
+    setPreviewTime(time);
+    setPreviewPosition(position);
+    setShowPreview(true);
   };
 
-  // Stop seeking
+  const handleSeeking = (e: MouseEvent) => {
+    if (!isSeeking || !videoRef.current) return;
+
+    const { time, position } = calculateTimeAndPosition(e);
+    setPreviewTime(time);
+    setPreviewPosition(position);
+
+    if (previewVideoRef.current) {
+      previewVideoRef.current.currentTime = time;
+    }
+  };
+
   const stopSeeking = () => {
-    togglePlayPause();
-    setIsSeeking(false);
-  };
+    if (!videoRef.current || !isSeeking) return;
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isSeeking && videoRef.current) {
-      const rect = (e.target as HTMLDivElement).getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const newTime = (offsetX / rect.width) * duration;
-      videoRef.current.currentTime = newTime;
+    videoRef.current.currentTime = previewTime;
+    setCurrentTime(previewTime);
+    setIsSeeking(false);
+    setShowPreview(false);
+
+    if (wasPlaying) {
+      videoRef.current.play().catch((error) => {
+        console.error("Error resuming video:", error);
+      });
+      setIsPlaying(true);
     }
   };
 
   useEffect(() => {
     if (isSeeking) {
-      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mousemove", handleSeeking);
       window.addEventListener("mouseup", stopSeeking);
-    } else {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", stopSeeking);
     }
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mousemove", handleSeeking);
       window.removeEventListener("mouseup", stopSeeking);
     };
-  }, [duration, isSeeking]);
+  }, [isSeeking, previewTime]);
+
+  const getProgressBarWidth = (): number => {
+    if (!videoRef.current) return 0;
+    const time = isSeeking ? previewTime : currentTime;
+    const videoDuration = duration || 0;
+    return videoDuration > 0 ? (time / videoDuration) * 100 : 0;
+  };
+
+  useEffect(() => {
+    if (showPreview && previewVideoRef.current && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        requestAnimationFrame(() => {
+          ctx.drawImage(previewVideoRef.current!, 0, 0, 160, 90);
+        });
+      }
+    }
+  }, [showPreview, previewTime]);
 
   return (
-    <Squircle cornerRadius={cornerRadius} cornerSmoothing={0.8} className="w-full h-full block overflow-hidden">
+    <Squircle
+      className="w-full h-full block overflow-hidden"
+      cornerRadius={cornerRadius}>
       <div className="group relative flex w-full h-full aspect-video bg-zinc-100">
         <video
           ref={videoRef}
           onTimeUpdate={handleTimeUpdate}
           onDurationChange={handleDurationChange}
+          onLoadedMetadata={handleDurationChange}
           onEnded={handleVideoEnd}
           className="w-full h-full overflow-hidden"
-          src="/sample.mp4"
+          src={video}
+          preload="metadata"
+        />
+
+        <video
+          ref={previewVideoRef}
+          className="hidden"
+          src={video}
+          preload="metadata"
         />
 
         <div className="absolute flex flex-col w-full h-full">
@@ -160,13 +276,8 @@ const VideoPlayer = () => {
           <div
             className={cn(
               "absolute flex opacity-0 controls gap-x-[10px] w-full bottom-0 items-center px-[15px] py-[15px] text-black duration-500 transition-all",
-              videoRef.current &&
-              videoRef.current.currentTime > 0 &&
-              "group-hover:opacity-100",
-              videoRef.current &&
-              videoRef.current.currentTime > 0 &&
-              !isPlaying &&
-              "opacity-100",
+              isVideoStarted && "group-hover:opacity-100",
+              isVideoStarted && !isPlaying && "opacity-100",
             )}
           >
             <ControlButton
@@ -191,30 +302,60 @@ const VideoPlayer = () => {
 
             <div className="flex flex-grow items-center justify-center px-[15px] py-[5px] gap-x-[10px] bg-white/5 backdrop-blur-md rounded-full h-[40px] z-10">
               <div className="text-[15px] text-white">
-                {videoRef.current && formatTime(videoRef.current.currentTime)}
+                {formatTime(isSeeking ? previewTime : currentTime)}
               </div>
               <div
+                ref={progressBarRef}
                 onMouseDown={startSeeking}
-                onClick={handleSeek}
-                className="relative flex-grow h-[8px] rounded-full bg-zinc-50/25 cursor-pointer"
+                onMouseMove={handleProgressBarHover}
+                onMouseLeave={handleProgressBarLeave}
+                className="relative flex-grow h-[8px] rounded-full bg-zinc-50/25 cursor-pointer group/progress"
               >
                 <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${videoRef.current && (videoRef.current.currentTime / videoRef.current.duration) * 100}%`, }}
-                  className="absolute h-[8px] rounded-full bg-zinc-100/35"
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${getProgressBarWidth()}%` }}
+                  transition={{ duration: isSeeking ? 0 : 0.1 }}
+                  className="absolute h-full rounded-full bg-zinc-100/35"
                 />
+                <div
+                  className={cn(
+                    "absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-lg opacity-0 transition-opacity",
+                    "group-hover/progress:opacity-0",
+                    isSeeking && "opacity-0"
+                  )}
+                  style={{
+                    left: `${getProgressBarWidth()}%`,
+                    transform: 'translate(-50%, -50%)'
+                  }}
+                />
+
+                {showPreview && (
+                  <div
+                    className="absolute bottom-[20px] transform -translate-x-1/2 bg-black rounded-lg overflow-hidden shadow-lg"
+                    style={{
+                      left: `${previewPosition}px`,
+                      width: '160px',
+                      height: '90px'
+                    }}
+                  >
+                    <canvas
+                      ref={canvasRef}
+                      width={160}
+                      height={90}
+                    />
+                    <div className="absolute bottom-0 w-full bg-black/50 px-2 py-1 text-xs text-white text-center">
+                      {formatTime(previewTime)}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="text-[15px] text-white">
-                {videoRef.current && formatTime(videoRef.current.duration)}
+                {formatTime(duration)}
               </div>
             </div>
 
             <ControlButton onClick={toggleFullscreen}>
-              {isMuted ? (
-                <FullscreenIcon />
-              ) : (
-                <FullscreenIcon />
-              )}
+              <FullscreenIcon />
             </ControlButton>
           </div>
         </div>
