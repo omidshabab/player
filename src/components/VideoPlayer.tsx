@@ -6,33 +6,37 @@ import PauseIcon from "./icons/PauseIcon";
 import ControlButton from "./ControlButton";
 import { motion } from "framer-motion";
 import { Squircle } from "corner-smoothing";
-import { cn } from "@/lib/utils";
+import { cn, formatTime } from "@/lib/utils";
 import UnMuteIcon from "./icons/UnMuteIcon";
 import MuteIcon from "./icons/MuteIcon";
 import FullscreenIcon from "./icons/FullscreenIcon";
 
-const formatTime = (timeInSeconds: number): string => {
-  if (!isFinite(timeInSeconds)) return "0:00";
+const BREAKPOINTS = {
+  sm: 640,
+  md: 768,
+  lg: 1024,
+  xl: 1280,
+} as const;
 
-  const hours = Math.floor(timeInSeconds / 3600);
-  const minutes = Math.floor((timeInSeconds % 3600) / 60);
-  const seconds = Math.floor(timeInSeconds % 60);
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
+interface VideoPlayerProps {
+  video: string;
+  minCornerRadius?: number;
+  maxCornerRadius?: number;
+  breakpoint?: number;
+}
 
 const VideoPlayer = ({
-  video
-}: {
-  video: string,
-}) => {
+  video,
+  minCornerRadius = 20,
+  maxCornerRadius = 35,
+  breakpoint = BREAKPOINTS.md,
+}: VideoPlayerProps) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const progressBarRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -44,6 +48,30 @@ const VideoPlayer = ({
   const [showPreview, setShowPreview] = useState(false);
   const [previewPosition, setPreviewPosition] = useState(0);
   const [isVideoStarted, setIsVideoStarted] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.offsetWidth;
+        setContainerWidth(width);
+
+        const newRadius = width >= breakpoint ? maxCornerRadius : minCornerRadius;
+        setCornerRadius(newRadius);
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    updateDimensions();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [breakpoint, minCornerRadius, maxCornerRadius]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -64,23 +92,6 @@ const VideoPlayer = ({
     };
   }, []);
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 640) {
-        setCornerRadius(25);
-      } else {
-        setCornerRadius(45);
-      }
-    };
-
-    handleResize();
-
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
   const handleTimeUpdate = () => {
     if (!videoRef.current || isSeeking) return;
     setCurrentTime(videoRef.current.currentTime);
@@ -96,6 +107,26 @@ const VideoPlayer = ({
 
   const handleVideoEnd = () => {
     setIsPlaying(false);
+  };
+
+  const getResponsiveClasses = () => {
+    return {
+      playButton: cn(
+        "flex justify-center items-center bg-white/10 backdrop-blur-xl rounded-full transition-all duration-500",
+        containerWidth >= breakpoint ? "p-[35px]" : "p-[15px]",
+        "hover:scale-125"
+      ),
+      playIcon: cn(
+        containerWidth >= breakpoint
+          ? "w-[100px] h-[100px] ml-[8px] mt-[5px]"
+          : "w-[35px] h-[35px] ml-[2px] mt-[1px]"
+      ),
+      controls: cn(
+        "absolute flex opacity-0 controls gap-x-[10px] w-full bottom-0 items-center px-[15px] py-[15px] text-black duration-500 transition-all",
+        isVideoStarted && "group-hover:opacity-100",
+        isVideoStarted && !isPlaying && "opacity-100"
+      ),
+    };
   };
 
   const togglePlayPause = () => {
@@ -234,133 +265,140 @@ const VideoPlayer = ({
     }
   }, [showPreview, previewTime]);
 
+  const responsiveClasses = getResponsiveClasses();
+
   return (
-    <Squircle
-      className="w-full h-full block overflow-hidden"
-      cornerRadius={cornerRadius}>
-      <div className="group relative flex w-full h-full aspect-video bg-zinc-100">
-        <video
-          ref={videoRef}
-          onTimeUpdate={handleTimeUpdate}
-          onDurationChange={handleDurationChange}
-          onLoadedMetadata={handleDurationChange}
-          onEnded={handleVideoEnd}
-          className="w-full h-full overflow-hidden"
-          src={video}
-          preload="metadata"
-        />
+    <div ref={containerRef} className="w-full h-full">
+      <Squircle
+        className="w-full h-full block overflow-hidden"
+        cornerSmoothing={0.6}
+        cornerRadius={cornerRadius}>
+        <div className="group relative flex w-full h-full aspect-video bg-zinc-100">
+          <video
+            ref={videoRef}
+            onTimeUpdate={handleTimeUpdate}
+            onDurationChange={handleDurationChange}
+            onLoadedMetadata={handleDurationChange}
+            onEnded={handleVideoEnd}
+            className="w-full h-full overflow-hidden"
+            src={video}
+            preload="metadata"
+          />
 
-        <video
-          ref={previewVideoRef}
-          className="hidden"
-          src={video}
-          preload="metadata"
-        />
+          <video
+            ref={previewVideoRef}
+            className="hidden"
+            src={video}
+            preload="metadata"
+          />
 
-        <div className="absolute flex flex-col w-full h-full">
-          <div
-            className={cn(
-              "w-full flex flex-grow justify-center items-center opacity-0 group-hover:opacity-100 duration-500 transition-all",
-              !isPlaying && "opacity-100",
-            )}
-          >
+          <div className="absolute flex flex-col w-full h-full">
             <div
-              onClick={togglePlayPause}
-              className="flex justify-center items-center bg-white/10 backdrop-blur-xl rounded-full p-[15px] lg:p-[35px] aspect-square cursor-pointer hover:scale-125 transition-all duration-500"
+              className={cn(
+                "w-full flex flex-grow justify-center items-center opacity-0 group-hover:opacity-100 duration-500 transition-all",
+                !isPlaying && "opacity-100",
+              )}
             >
-              {!isPlaying && <PlayIcon className="w-[35px] h-[35px] sm:w-[100px] sm:h-[100px] ml-[2px] mt-[1px] lg:ml-[8px] lg:mt-[5px]" />}
-              {isPlaying && <PauseIcon />}
-            </div>
-          </div>
-
-          <div
-            className={cn(
-              "absolute flex opacity-0 controls gap-x-[10px] w-full bottom-0 items-center px-[15px] py-[15px] text-black duration-500 transition-all",
-              isVideoStarted && "group-hover:opacity-100",
-              isVideoStarted && !isPlaying && "opacity-100",
-            )}
-          >
-            <ControlButton
-              onClick={togglePlayPause}
-              className="hidden sm:block">
-              {isPlaying ? (
-                <PauseIcon className="w-[20px] h-[20px]" />
-              ) : (
-                <PlayIcon
-                  className="w-[20px] h-[20px] ml-[2px] mt-[1px]"
-                />
-              )}
-            </ControlButton>
-
-            <ControlButton onClick={toggleMute}>
-              {isMuted ? (
-                <UnMuteIcon />
-              ) : (
-                <MuteIcon />
-              )}
-            </ControlButton>
-
-            <div className="flex flex-grow items-center justify-center px-[15px] py-[5px] gap-x-[10px] bg-white/5 backdrop-blur-md rounded-full h-[40px] z-10">
-              <div className="text-[15px] text-white">
-                {formatTime(isSeeking ? previewTime : currentTime)}
-              </div>
               <div
-                ref={progressBarRef}
-                onMouseDown={startSeeking}
-                onMouseMove={handleProgressBarHover}
-                onMouseLeave={handleProgressBarLeave}
-                className="relative flex-grow h-[8px] rounded-full bg-zinc-50/25 cursor-pointer group/progress"
+                onClick={togglePlayPause}
+                className="flex justify-center items-center bg-white/10 backdrop-blur-xl rounded-full p-[15px] lg:p-[35px] aspect-square cursor-pointer hover:scale-125 transition-all duration-500"
               >
-                <motion.div
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${getProgressBarWidth()}%` }}
-                  transition={{ duration: isSeeking ? 0 : 0.1 }}
-                  className="absolute h-full rounded-full bg-zinc-100/35"
-                />
-                <div
-                  className={cn(
-                    "absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-lg opacity-0 transition-opacity",
-                    "group-hover/progress:opacity-0",
-                    isSeeking && "opacity-0"
-                  )}
-                  style={{
-                    left: `${getProgressBarWidth()}%`,
-                    transform: 'translate(-50%, -50%)'
-                  }}
-                />
-
-                {showPreview && (
-                  <div
-                    className="absolute bottom-[20px] transform -translate-x-1/2 bg-black rounded-lg overflow-hidden shadow-lg"
-                    style={{
-                      left: `${previewPosition}px`,
-                      width: '160px',
-                      height: '90px'
-                    }}
-                  >
-                    <canvas
-                      ref={canvasRef}
-                      width={160}
-                      height={90}
-                    />
-                    <div className="absolute bottom-0 w-full bg-black/50 px-2 py-1 text-xs text-white text-center">
-                      {formatTime(previewTime)}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="text-[15px] text-white">
-                {formatTime(duration)}
+                {!isPlaying && <PlayIcon className="w-[35px] h-[35px] sm:w-[100px] sm:h-[100px] ml-[2px] mt-[1px] lg:ml-[8px] lg:mt-[5px]" />}
+                {isPlaying && <PauseIcon />}
               </div>
             </div>
 
-            <ControlButton onClick={toggleFullscreen}>
-              <FullscreenIcon />
-            </ControlButton>
+            <div
+              className={cn(
+                "absolute flex opacity-0 controls gap-x-[10px] w-full bottom-0 items-center px-[15px] py-[15px] text-black duration-500 transition-all",
+                isVideoStarted && "group-hover:opacity-100",
+                isVideoStarted && !isPlaying && "opacity-100",
+              )}
+            >
+              <ControlButton
+                onClick={togglePlayPause}
+                className="hidden sm:block">
+                {isPlaying ? (
+                  <PauseIcon className="w-[20px] h-[20px]" />
+                ) : (
+                  <PlayIcon
+                    className="w-[20px] h-[20px] ml-[2px] mt-[1px]"
+                  />
+                )}
+              </ControlButton>
+
+              <ControlButton onClick={toggleMute}>
+                {isMuted ? (
+                  <UnMuteIcon />
+                ) : (
+                  <MuteIcon />
+                )}
+              </ControlButton>
+
+              <div className="flex flex-grow items-center justify-center px-[15px] py-[5px] gap-x-[10px] bg-white/5 backdrop-blur-md rounded-full h-[40px] z-10">
+                <div className="text-[15px] text-white">
+                  {formatTime(isSeeking ? previewTime : currentTime)}
+                </div>
+                <div
+                  ref={progressBarRef}
+                  onMouseDown={startSeeking}
+                  onMouseMove={handleProgressBarHover}
+                  onMouseLeave={handleProgressBarLeave}
+                  className="relative flex-grow h-[8px] rounded-full bg-zinc-50/25 cursor-pointer group/progress"
+                >
+                  <motion.div
+                    initial={{ width: "0%" }}
+                    animate={{ width: `${getProgressBarWidth()}%` }}
+                    transition={{ duration: isSeeking ? 0 : 0.1 }}
+                    className="absolute h-full rounded-full bg-zinc-100/35"
+                  />
+                  <div
+                    className={cn(
+                      "absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-lg opacity-0 transition-opacity",
+                      "group-hover/progress:opacity-0",
+                      isSeeking && "opacity-0"
+                    )}
+                    style={{
+                      left: `${getProgressBarWidth()}%`,
+                      transform: 'translate(-50%, -50%)'
+                    }}
+                  />
+
+                  {showPreview && (
+                    <div
+                      className="absolute bottom-[20px] transform -translate-x-1/2 bg-black rounded-[10px] overflow-hidden"
+                      style={{
+                        left: `${previewPosition}px`,
+                        width: '160px',
+                        height: '90px'
+                      }}
+                    >
+                      <canvas
+                        ref={canvasRef}
+                        width={160}
+                        height={90}
+                      />
+                      <div className="absolute bottom-0 w-full px-[5px] py-[5px]">
+                        <div className="flex justify-center items-center w-min px-[5px] border-white/5 border-[1px] backdrop-blur-md bg-black/5 text-[12px] text-white text-center rounded-full">
+                          {formatTime(previewTime)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="text-[15px] text-white">
+                  {formatTime(duration)}
+                </div>
+              </div>
+
+              <ControlButton onClick={toggleFullscreen}>
+                <FullscreenIcon />
+              </ControlButton>
+            </div>
           </div>
         </div>
-      </div>
-    </Squircle>
+      </Squircle>
+    </div>
   );
 };
 
