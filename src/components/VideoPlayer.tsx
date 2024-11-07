@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import PlayIcon from "./icons/PlayIcon";
 import PauseIcon from "./icons/PauseIcon";
 import ControlButton from "./ControlButton";
@@ -301,16 +301,15 @@ const VideoPlayer = ({
             >
               <div
                 onClick={togglePlayPause}
-                className="flex justify-center items-center bg-white/10 backdrop-blur-xl rounded-full p-[15px] lg:p-[35px] aspect-square cursor-pointer hover:scale-125 transition-all duration-500"
-              >
-                {!isPlaying && <PlayIcon className="w-[35px] h-[35px] sm:w-[100px] sm:h-[100px] ml-[2px] mt-[1px] lg:ml-[8px] lg:mt-[5px]" />}
-                {isPlaying && <PauseIcon />}
+                className="flex justify-center items-center bg-white/10 backdrop-blur-xl rounded-full p-[15px] md:p-[35px] aspect-square cursor-pointer hover:scale-110 transition-all duration-500">
+                {!isPlaying && <PlayIcon className="w-[35px] h-[35px] md:w-[100px] md:h-[100px] ml-[2px] mt-[1px] md:ml-[8px] md:mt-[5px]" />}
+                {isPlaying && <PauseIcon className="w-[35px] h-[35px] md:w-[100px] md:h-[100px]" />}
               </div>
             </div>
 
             <div
               className={cn(
-                "absolute flex opacity-0 controls gap-x-[10px] w-full bottom-0 items-center px-[15px] py-[15px] text-black duration-500 transition-all",
+                "absolute flex flex-col gap-y-[5px] sm:flex-row opacity-0 controls gap-x-[10px] w-full bottom-0 items-center px-[15px] py-[15px] text-black duration-500 transition-all",
                 isVideoStarted && "group-hover:opacity-100",
                 isVideoStarted && !isPlaying && "opacity-100",
               )}
@@ -327,7 +326,9 @@ const VideoPlayer = ({
                 )}
               </ControlButton>
 
-              <ControlButton onClick={toggleMute}>
+              <ControlButton
+                onClick={toggleMute}
+                className="hidden sm:block">
                 {isMuted ? (
                   <UnMuteIcon />
                 ) : (
@@ -335,7 +336,7 @@ const VideoPlayer = ({
                 )}
               </ControlButton>
 
-              <div className="flex flex-grow items-center justify-center px-[15px] py-[5px] gap-x-[10px] bg-white/5 backdrop-blur-md rounded-full h-[40px] z-10">
+              <div className="hidden sm:flex w-full flex-grow items-center justify-center px-[15px] py-[5px] gap-x-[10px] bg-white/5 backdrop-blur-md rounded-full h-[40px] z-10">
                 <div className="text-[15px] text-white">
                   {formatTime(isSeeking ? previewTime : currentTime)}
                 </div>
@@ -366,20 +367,17 @@ const VideoPlayer = ({
 
                   {showPreview && (
                     <div
-                      className="absolute bottom-[20px] transform -translate-x-1/2 bg-black rounded-[10px] overflow-hidden"
+                      className="absolute bottom-[20px] w-[107px] h-[60px] md:w-[160px] md:h-[90px] transform -translate-x-1/2 bg-black rounded-[10px] overflow-hidden"
                       style={{
                         left: `${previewPosition}px`,
-                        width: '160px',
-                        height: '90px'
-                      }}
-                    >
+                      }}>
                       <canvas
                         ref={canvasRef}
                         width={160}
                         height={90}
                       />
                       <div className="absolute bottom-0 w-full px-[5px] py-[5px]">
-                        <div className="flex justify-center items-center w-min px-[5px] border-white/5 border-[1px] backdrop-blur-md bg-black/5 text-[12px] text-white text-center rounded-full">
+                        <div className="flex justify-center items-center w-min px-[5px] border-white/5 border-[1px] backdrop-blur-md bg-black/5 text-[12px] sm:text-[12px] text-white text-center rounded-full">
                           {formatTime(previewTime)}
                         </div>
                       </div>
@@ -391,7 +389,9 @@ const VideoPlayer = ({
                 </div>
               </div>
 
-              <ControlButton onClick={toggleFullscreen}>
+              <ControlButton
+                onClick={toggleFullscreen}
+                className="hidden sm:block">
                 <FullscreenIcon />
               </ControlButton>
             </div>
