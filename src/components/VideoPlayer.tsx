@@ -5,7 +5,7 @@ import PlayIcon from "./icons/PlayIcon";
 import PauseIcon from "./icons/PauseIcon";
 import ControlButton from "./ControlButton";
 import { motion } from "framer-motion";
-import { Squircle } from "corner-smoothing";
+import Squircle from './Squircle';
 import { cn, formatTime } from "@/lib/utils";
 import UnMuteIcon from "./icons/UnMuteIcon";
 import MuteIcon from "./icons/MuteIcon";
@@ -271,7 +271,7 @@ const VideoPlayer = ({
     <div ref={containerRef} className="w-full h-full">
       <Squircle
         className="w-full h-full block overflow-hidden"
-        cornerSmoothing={0.6}
+        cornerSmoothing={90}
         cornerRadius={cornerRadius}>
         <div className="group relative flex w-full h-full aspect-video bg-zinc-100">
           <video
@@ -280,7 +280,7 @@ const VideoPlayer = ({
             onDurationChange={handleDurationChange}
             onLoadedMetadata={handleDurationChange}
             onEnded={handleVideoEnd}
-            className="w-full h-full overflow-hidden"
+            className="w-full h-full overflow-hidden object-cover"
             src={video}
             preload="metadata"
           />
